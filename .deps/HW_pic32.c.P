@@ -1,0 +1,2 @@
+driver/HW_pic32.c.o: driver/HW_pic32.c
+driver/HW_pic32.c :

@@ -1,0 +1,108 @@
+#include <stdio.h>
+#include <stdlib.h>
+//#include <math.h>
+#include <string.h>
+//#include <time.h>
+#include <pic32mx.h>
+#include "driver/OLED_I2C.h"
+
+
+#define true 1
+#define false 0
+
+
+/*int init() {
+    return 0;
+}*/
+
+    int x = 64;
+    int y = 32;
+    int ox, oy;
+
+void init(){
+    AD1PCFG = ~(0x12);
+    TRISBSET = 0x12;
+
+
+    
+    /* Data format in uint32, 0 - 1024
+    Manual sampling, auto conversion when sampling is done
+    FORM = 0x4; SSRC = 0x7; CLRASAM = 0x0; ASAM = 0x0; */
+    AD1CON1 = (0x4 << 8) | (0x7 << 5);
+    
+    AD1CON2 = 0x0;
+    AD1CON3 |= (0x1 << 15);
+        
+    /* Turn on ADC */
+
+    TRISD &= 0xffe0; // bits 11 - 5 are set into inputs
+    TRISF &= 0x2;
+
+    begin();
+}
+
+void ISRHANDLER() {
+    return;
+}
+
+
+int getbtns(void) {
+    while(1) {
+        return ((PORTD >> 4) & 0xe) | ((PORTF >> 1) & 0x1);
+    }
+}
+
+int main() {
+
+    init();
+    const unsigned char test[9] = {
+                0xf, 0x0, 0xf,
+                0x0, 0xf, 0x0,
+                0xf, 0x0, 0xf
+    };
+
+    while(true) {
+        /* PORTB.2 is analog pin with potentiometer*/
+        
+        /* Start sampling, wait until conversion is done */
+        /* Use pin 2 for positive */
+        AD1CHS = (0x2 << 16);
+        AD1CON1 |= (0x1 << 15);
+        AD1CON1 |= (0x12);
+		while(!(AD1CON1 & 0x12));
+		while(!(AD1CON1 & 0x12));
+
+        if(ADC1BUF0 > 900) {
+            x++;
+        }
+        else if(ADC1BUF0 < 512)
+        {
+            x--;
+        }
+
+        AD1CHS = (0x1 << 16);
+        AD1CON1 |= (0x1 << 15);
+        AD1CON1 |= (0x12);
+
+
+        if(ADC1BUF1 > 900) {
+            y++;
+        }
+        else if(ADC1BUF1 < 512)
+        {
+            y--;
+        }
+
+        setPixel(x, y);
+        ox = x;
+        oy = y;
+        update();
+        clrPixel(ox, oy);
+        if((x > 128) || (x < 0) || (y > 64) || (y < 0)) {
+            x = 64;
+            y = 32;
+        }
+    }
+
+    return 0;
+}
