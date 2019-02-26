@@ -99,7 +99,7 @@ void OLED_refresh()
 	int i;
     for(i = 0 ; i < 8; i++){
         _sendTWIcommand(SH1106_SETSTARTPAGE + i);
-            _sendTWIcommand(0);
+            _sendTWIcommand(2);
             _sendTWIcommand(0x10);
 				int pixel;
         for(pixel = 0; pixel < 128; pixel++){

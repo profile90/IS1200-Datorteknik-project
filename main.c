@@ -13,15 +13,38 @@ uint16_t x = 64;
 uint16_t y = 32;
 uint16_t oy, ox;
 
+#define UP 0x8
+#define DOWN 0x4 
+#define LEFT 0x2
+#define RIGHT 0x1
+
+typedef struct Point {
+    int x;
+    int y;
+} point;
+
+typedef struct missile {
+    int sx, sy;
+    int dx, dy;
+    int k, d;
+    Point progress[128];
+    int shot;
+} missile;
 
 void btnINIT() {
-    TRISDSET = (1 << 8) | (1 << 0) | (1 << 1);
-    TRISFSET = (1 << 1);
+    TRISDSET = 0x103;
+    TRISFSET = 0x2;
 }
 
-void readBtn() {
+int readBtn() {
+    while(1) {
+            int up   = (PORTD >> 5) & 0x8;
+            int left = (PORTD) & 0x2;
+            int right = (PORTD) & 0x1;
+            int down = (PORTF << 1) & 0x4;
 
-    
+            return up | left | right | down;
+    }    
 }
 
 void stickINIT() {
@@ -120,16 +143,70 @@ void stickInput(int stick) {
     }
 }
 
+void shoot(missile * m, int sx, int sy, int dx, int dy) {
+    m->sx = sx;
+    m->sy = sy;
+    m->dx = dx;
+    m->dy = dy;
+    m->k  = (sy - dy) / (sx - dx);
+    m->progress = 0;
+    m->shot = 1;
 
+}
+
+missileUpdate(missile * m) {
+    if(m->shot) {
+        if(m->sx > m->dx) {
+            OLED_setPixel(progress + 1,)
+        }
+        m->progress++;
+    }
+}
 
 int main() {
+    btnINIT();
     stickINIT();
     OLED_start();
     
-    
+    int sx, sy;
+    int dx, dy;
+    int next = 0;
+
+    missile ms[20];
+    int mi = 0;
+
     while(1) {
         stickInput(XSTICK);
-        stickInput(YSTICK);
+        stickInput(YSTICK); 
+
+        if((readBtn() & UP) == 0){ //up
+        }
+        
+        if((readBtn() & DOWN) == 0){ //down
+        }
+        
+        if((readBtn() & LEFT) == 0){ //left
+        }
+        
+        if((readBtn() & RIGHT) == 0){ //right
+            if(!next) {
+                sx = x;
+                sy = y;
+                next = 1;
+            }
+            else 
+            {
+                dx = x;
+                dy = y;
+                shoot(&ms[mi], sx, sy, dx, dy);
+                mi++;
+                if(mi == 20) {
+                    mi = 0;
+                }
+                next = 0;
+            }
+        }
+
         if(!OLED_boundsCheck(x, y)) {
                 x = 64;
                 y = 32;

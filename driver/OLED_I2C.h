@@ -37,9 +37,6 @@
 
 #define MSBFIRST 1
 
-#define LEFT	0
-#define RIGHT	9999
-#define CENTER	9998
 
 #define SH1106_COMMAND			0x00
 #define SH1106_DATA			    0xC0
