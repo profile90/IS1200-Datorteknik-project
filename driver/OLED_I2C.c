@@ -2,15 +2,21 @@
 #include "pic32mx.h"  /* Declarations of system-specific addresses etc */
 #include "font.h"
 
+typedef int bool;
+
 /*  NOTICE:
  *
  *  Adapted from https://github.com/rogerclarkmelbourne/Arduino_STM32/ and 
- *  
+ *               https://github.com/StelFoog/IS1200-Datorteknik/blob/master/Project/
  *
  *  for use with PIC32 and the C-programming language
  * 
  */
-inline void OLED__waitForIdleBus() { while (I2C1CON & 0x1f) {} }
+inline void OLED_waitForIdleBus() { while (I2C1CON & 0x1f) {} }
+
+bool OLED_boundsCheck (int x, int y) {
+    return ((x >= 0) && (x < 128) && (y >= 0) && (y < 64));
+}
 
 void _initTWI()
 {
@@ -25,31 +31,39 @@ void _initTWI()
 
 
 void _sendTWIcommand(uint8_t value) {
-    OLED__waitForIdleBus();								// Wait for I2C bus to be Idle before starting
+    OLED_waitForIdleBus();								// Wait for I2C bus to be Idle before starting
     I2C1CONSET = (1 << _I2CCON_SEN);					// Send start condition
     
     if (I2C1STAT & (1 << _I2CSTAT_BCL)) { return; }		// Check if there is a bus collision
     while (I2C1CON & (1 << _I2CCON_SEN)) {}				// Wait for start condition to finish
     
-    I2C1TRN = (SSD1306_ADDR<<1);						// Send device Write address
+    I2C1TRN = (SH1106_ADDR<<1);						// Send device Write address
     while (I2C1STAT & (1 << _I2CSTAT_IWCOL))			// Check if there is a Write collision
     {
         I2C1STATCLR = (1 << _I2CSTAT_IWCOL);			// Clear Write collision flag
-        I2C1TRN = (SSD1306_ADDR<<1);					// Retry send device Write address
+        I2C1TRN = (SH1106_ADDR << 1);					// Retry send device Write address
     }
     
     while (I2C1STAT & (1 << _I2CSTAT_TRSTAT)) {}		// Wait for transmit to finish
     while (I2C1STAT & (1 << _I2CSTAT_ACKSTAT)) {}		// Wait for ACK
     
-    I2C1TRN = SSD1306_DATA_CONTINUE;					// Send the command for continous data
+    I2C1TRN = SH1106_COMMAND;					// Send the command for continous data
     while (I2C1STAT & (1 << _I2CSTAT_TRSTAT)) {}		// Wait for transmit to finish
     while (I2C1STAT & (1 << _I2CSTAT_ACKSTAT)) {}		// Wait for ACK
+
+    I2C1TRN = value;					// Send the command for continous data
+    while (I2C1STAT & (1 << _I2CSTAT_TRSTAT)) {}		// Wait for transmit to finish
+    while (I2C1STAT & (1 << _I2CSTAT_ACKSTAT)) {}		// Wait for ACK
+
+    I2C1CONSET = (1 << _I2CCON_PEN);
+    while(I2C1CON & (1 << _I2CCON_PEN)) {}
 }
 
 
 
-void OLED__start() {
-
+void OLED_start() {
+      
+    _initTWI();
     _sendTWIcommand(SH1106_DISPLAY_OFF);
     _sendTWIcommand(SH1106_SET_DISPLAY_CLOCK_DIV_RATIO);
         _sendTWIcommand(0x80);
@@ -61,7 +75,7 @@ void OLED__start() {
     _sendTWIcommand(SH1106_CHARGE_PUMP);
     	_sendTWIcommand(0x14);
     _sendTWIcommand(SH1106_MEMORY_ADDR_MODE);
-        _sendTWIcommand(0x00); // Horizontal addressing mode 
+        _sendTWIcommand(0x10); // Horizontal addressing mode 
     _sendTWIcommand(SH1106_SET_SEGMENT_REMAP | 0x1);
     _sendTWIcommand(SH1106_COM_SCAN_DIR_DEC);
     _sendTWIcommand(SH1106_SET_COM_PINS);
@@ -80,46 +94,83 @@ void OLED__start() {
     OLED_refresh();
 }
 
+void OLED_refresh()
+{
+	int i;
+    for(i = 0 ; i < 8; i++){
+        _sendTWIcommand(SH1106_SETSTARTPAGE + i);
+            _sendTWIcommand(0);
+            _sendTWIcommand(0x10);
+				int pixel;
+        for(pixel = 0; pixel < 128; pixel++){
+            OLED_waitForIdleBus();																// Wait for I2C bus to be Idle before starting
+            I2C1CONSET = (1 << _I2CCON_SEN);									// Send start condition
+            if (I2C1STAT & (1 << _I2CSTAT_BCL)) { return; }		// Check if there is a bus collision
+            while (I2C1CON & (1 << _I2CCON_SEN)) {}						// Wait for start condition to finish
+            I2C1TRN = (SH1106_ADDR<<1);												// Send device Write address
+            while (I2C1STAT & (1 << _I2CSTAT_IWCOL))					// Check if there is a Write collision
+            {
+                I2C1STATCLR = (1 << _I2CSTAT_IWCOL);					// Clear Write collision flag
+                I2C1TRN = (SH1106_ADDR<<1);										// Retry send device Write address
+            }
+            while (I2C1STAT & (1 << _I2CSTAT_TRSTAT)) {}			// Wait for transmit to finish
+            while (I2C1STAT & (1 << _I2CSTAT_ACKSTAT)) {}			// Wait for ACK
+            I2C1TRN = SH1106_DATA_CONTINUE;										// Send the command for continous data
+            while (I2C1STAT & (1 << _I2CSTAT_TRSTAT)) {}			// Wait for transmit to finish
+            while (I2C1STAT & (1 << _I2CSTAT_ACKSTAT)) {}			// Wait for ACK
 
-void	OLED__refresh() {
-    _waitForIdleBus();
-    I2C1CONSET = (1 << _I2CON_SEN);
-    
-    if(I2C1STAT & (1 << _I2STAT_BCL)) { return; }
-    while(I2C1STAT & (1 << _I2STAT_SEN)) {};
-    I2C1TRN = (SH1106_ADDR << 1);										
+            int b;
+			for (b=0; b<16; b++) {																// Send data
+                I2C1TRN = scrbuf[i * 128 + pixel];						// Set specifik pixel
+                while (I2C1STAT & (1 << _I2CSTAT_TRSTAT)) {}  // Wait for transmit to finish
+                while (I2C1STAT & (1 << _I2CSTAT_ACKSTAT)) {} // Wait for ACK
+                ++pixel;
+            }
 
-    while(I2C1STAT & (1 << _I2CSTAT_IWCOL)){
-        I2C1STATCLR = (1 << _I2CSTAT_IWCOL);
-        I2C1TRN     = (SH1106_ADDR << 1)
+            --pixel;
+            I2C1CONSET = (1 << _I2CCON_PEN);				// Send stop condition
+            while (I2C1CON & (1 << _I2CCON_PEN)) {}	// Wait for stop condition
+        }
     }
-    while(I2C1STAT & (1 << _I2CSTAT_TRSTAT)) {}
-    while(I2C1STAT & (1 << _I2CSTAT_ACKSTAT)) {}
-
-    I2C1TRN = SH1106_DATA_CONTINUE;
-    while(I2C1STAT & (1 << _I2CSTAT_TRSTAT)) {}
-    while(I2C1STAT & (1 << _I2CSTAT_ACKSTAT)) {}
+}
 
 
-
-    for(int i = 0; i < BUFFERSIZE; i++) {
-        
+void    OLED_fill() {
+    int i;
+    for(i = 0; i < BUFFERSIZE; i++) {
+        scrbuf[i] = 0xFF;
+    }
+}
+void	OLED_clear() {
+    int i;
+    for(i = 0; i < BUFFERSIZE; i++) {
+        scrbuf[i] = 0x0;
     }
 }
 
-
-void    OLED__fill() {
-
+void	OLED_invert(char mode) {
+    if (mode != 0) {
+		_sendTWIcommand(SH1106_INVERT_DISPLAY);
+    }
+	else {
+		_sendTWIcommand(SH1106_NORMAL_DISPLAY);
+    }
 }
-void	OLED__clear() {
 
-}
-void	OLED__invert(char mode) {
+void	OLED_setPixel(uint16_t x, uint16_t y) {
+    if(OLED_boundsCheck(x, y)) {
+        int by = ((y / 8) * 128) + x;
+        int bi = y % 8;
 
+        scrbuf[by] = scrbuf[by] | (1 << bi); 
+    }
 }
-void	OLED__setPixel(uint16_t x, uint16_t y) {
+void	OLED_clrPixel(uint16_t x, uint16_t y) {
+    if(OLED_boundsCheck(x, y)) {
+        int by = ((y / 8) * 128) + x;
+        int bi = y % 8;
 
-}
-void	OLED__clrPixel(uint16_t x, uint16_t y) {
+        scrbuf[by] = scrbuf[by] & ~(1 << bi); 
+    }
 
 }

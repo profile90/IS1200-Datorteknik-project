@@ -2,22 +2,16 @@
 #include <stdlib.h>
 #include <pic32mx.h>
 #include "driver/OLED_I2C.h"
+#include "defines.h"
 
 /*
  * PUT IN GLOBAL DEFINE
  */
-#define bool32 int
-#define bool16 char
-
-#define STICKUPPERLIMIT 611
-#define STICKLOWERLIMIT 412
-#define YSTICK 0
-#define XSTICK 1
 
 
-int x = 64;
-int y = 32;
-int oy, ox;
+uint16_t x = 64;
+uint16_t y = 32;
+uint16_t oy, ox;
 
 
 void btnINIT() {
@@ -130,20 +124,23 @@ void stickInput(int stick) {
 
 int main() {
     stickINIT();
-    displayBegin();
+    OLED_start();
+    
     
     while(1) {
         stickInput(XSTICK);
         stickInput(YSTICK);
-        (oled.clrPixel)(ox, oy);
-        setPixel(x, y);
-  
-      if((x > 128) || (x < 0) || (y > 64) || (y < 0)) {
-            x = 64;
-            y = 32;
+        if(!OLED_boundsCheck(x, y)) {
+                x = 64;
+                y = 32;
         }
-        update();
+
+        OLED_clrPixel(ox, oy);
+        OLED_setPixel(x, y);
+  
+        OLED_refresh();
 
     }
+    
     return 0;
 }

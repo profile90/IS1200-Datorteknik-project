@@ -1,13 +1,19 @@
-#ifndef HEADER_OLED_I2C
-#define HEADER_OLED_I2C
-
+#ifndef HEADER_OLEDI2C
+#define HEADER_OLEDI2C
 
 /********* Hardware Specific Defines ***********/
+#define bitmapbyte(x) bitmap[x]
 
-#define SDA	18					// A4 
-#define SCL	19					// A5
-#define TWI_FREQ 400000L
+#define PROGMEM
+#define bitmapdatatype unsigned char*
 
+#define SDA	18					// A4 (Remeber to set the jumper correctly)
+#define SCL	19					// A5 (Remeber to set the jumper correctly)
+
+#ifndef TWI_FREQ
+	#define TWI_FREQ 400000L
+
+#endif
 
 
 #define _I2CCON_ON 15
@@ -45,10 +51,10 @@
 
 /******** SH1106 Commandset ************************
     Derivate of SSD1306 Commandset, see: 
-        https://github.com/rogerclarkmelbourne/Arduino_STM32/blob/master/STM32F1/libraries/OLED_I2C/OLED_I2C.h
+        https://github.com/rogerclarkmelbourne/Arduino_STM32/blob/master/STM32F1/libraries/OLEDI2C/OLEDI2C.h
 
     With notes and remarks from Axel Pettersson & Samuel Larsson, see:
-        https://github.com/StelFoog/IS1200-Datorteknik/blob/master/Project/driver/OLED_I2C.h
+        https://github.com/StelFoog/IS1200-Datorteknik/blob/master/Project/driver/OLEDI2C.h
     
 ****************************************************/
 
@@ -95,20 +101,20 @@
 #include <stdint.h>
 
 
-uint8_t			scrbuf[BUFFERSIZE];
+uint8_t			scrbuf[1024];
 
 void	HW__initTWI();
 void	HW__sendTWIstart();
 void	HW__sendTWIstop();
 void	HW__sendTWIcommand(uint8_t value);
 
-void	OLED__start();
-void	OLED__refresh();
-void	OLED__setBrightness(uint8_t value);
-void    OLED__fill();
-void	OLED__clear();
-void	OLED__invert(char mode);
-void	OLED__setPixel(uint16_t x, uint16_t y);
-void	OLED__clrPixel(uint16_t x, uint16_t y);
+void	OLED_refresh();
+void	OLED_start();
+void	OLED_setBrightness(uint8_t value);
+void    OLED_fill();
+void	OLED_clear();
+void	OLED_invert(char mode);
+void	OLED_setPixel(uint16_t x, uint16_t y);
+void	OLED_clrPixel(uint16_t x, uint16_t y);
 
 #endif
