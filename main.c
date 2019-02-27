@@ -3,33 +3,92 @@
 #include <pic32mx.h>
 #include "driver/OLED_I2C.h"
 #include "defines.h"
+#include <math.h>
 
 /*
  * PUT IN GLOBAL DEFINE
  */
 
-
-uint16_t x = 64;
-uint16_t y = 32;
-uint16_t oy, ox;
-
 #define UP 0x8
 #define DOWN 0x4 
 #define LEFT 0x2
 #define RIGHT 0x1
+#define HEIGHT 64
+#define WIDTH 128
 
-typedef struct Point {
+typedef struct point {
     int x;
     int y;
 } point;
 
+typedef struct cursor{
+    point p;
+    point op;
+} cursor;
+
+int gx = 64;
+int gy = 32;
+int gox, goy;
+
 typedef struct missile {
     int sx, sy;
     int dx, dy;
-    int k, d;
-    Point progress[128];
+    int k, d, p;
+    point progress[128];
     int shot;
 } missile;
+
+void explode(missile * m, int x0, int y0, int radius)
+{
+    int x = radius;
+    int y = 0;
+    int xchange = 1 - (radius << 1);    // 1 - radius * 2
+    int ychange = 0;
+    int error = 0;
+
+}
+
+void shoot(missile * m, int sx, int sy, int dx, int dy) {
+    m->sx = sx;
+    m->sy = sy;
+    m->dx = dx;
+    m->dy = dy;
+    m->k  = (sy - dy) / (sx - dx);
+    m->d  = (int)sqrt(abs(pow((sx - dx), 2) + pow((sy - dy), 2)));
+    m->shot = 1;
+    m->p = 0;
+
+}
+
+void missileUpdate(missile * m) {
+    if(m->shot) {
+        if(m->p < m->d) {
+            int x  = m->sx;
+            int y  = m->sy;
+
+            float derror = (float)abs((m->sy - m->dy)/(m->sx - m->dx));
+            float error  = 0;
+            
+            if(m->sx < m->dx){
+                x++;
+            }
+            else{
+                x--;
+            }
+            y = m->k * x;
+            error = derror;
+            while(error > 0.5){
+                y += (m->dy > m->sy?1 : -1);
+                error -= 1;
+            }
+            m->progress[m->p].x = x;
+            m->progress[m->p].y = y;
+            m->p++;
+            OLED_setPixel(x, y);
+        }
+    }
+}
+
 
 void btnINIT() {
     TRISDSET = 0x103;
@@ -118,50 +177,33 @@ int getStickInput(bool stick) {
     return ADC1BUF0;
 }
 
+
 void stickInput(int stick) {
     int magnitude;
+
     if(stick == YSTICK) {
         magnitude = getStickInput(YSTICK);
-        oy = y;
+        goy = gy;
         if(magnitude > STICKUPPERLIMIT) {
-            y--;
+            gy--;
         } 
         if(magnitude < STICKLOWERLIMIT) {
-            y++;
+            gy++;
         }
     }
 
     if(stick == XSTICK) {
         magnitude = getStickInput(XSTICK);
-        ox = x;
+        gox = gx;
         if(magnitude > STICKUPPERLIMIT) {
-            x++;
+            gx++;
         } 
         if(magnitude < STICKLOWERLIMIT) {
-            x--;
+            gx--;
         }
     }
 }
 
-void shoot(missile * m, int sx, int sy, int dx, int dy) {
-    m->sx = sx;
-    m->sy = sy;
-    m->dx = dx;
-    m->dy = dy;
-    m->k  = (sy - dy) / (sx - dx);
-    m->progress = 0;
-    m->shot = 1;
-
-}
-
-missileUpdate(missile * m) {
-    if(m->shot) {
-        if(m->sx > m->dx) {
-            OLED_setPixel(progress + 1,)
-        }
-        m->progress++;
-    }
-}
 
 int main() {
     btnINIT();
@@ -174,6 +216,7 @@ int main() {
 
     missile ms[20];
     int mi = 0;
+    
 
     while(1) {
         stickInput(XSTICK);
@@ -190,14 +233,14 @@ int main() {
         
         if((readBtn() & RIGHT) == 0){ //right
             if(!next) {
-                sx = x;
-                sy = y;
+                sx = gx;
+                sy = gy;
                 next = 1;
             }
             else 
             {
-                dx = x;
-                dy = y;
+                dx = gx;
+                dy = gy;
                 shoot(&ms[mi], sx, sy, dx, dy);
                 mi++;
                 if(mi == 20) {
@@ -207,13 +250,13 @@ int main() {
             }
         }
 
-        if(!OLED_boundsCheck(x, y)) {
-                x = 64;
-                y = 32;
+        if(!OLED_boundsCheck(gx, gy)) {
+                gx = 64;
+                gy = 32;
         }
 
-        OLED_clrPixel(ox, oy);
-        OLED_setPixel(x, y);
+        OLED_clrPixel(gox, goy);
+        OLED_setPixel(gx, gy);
   
         OLED_refresh();
 
