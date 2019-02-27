@@ -1,0 +1,25 @@
+Game functions:
+
+Background graphics showing the cities.
+
+Missiles shooting from the top of the screen at random intervalls with random x and y coordinates (O character probably).
+
+Explotions when shooter hits missile and when missile hits city.
+        Explotion radius
+
+Shooter hoverer(X character probably) that moves with the help of signals from joystick.
+
+Shooting, gets information from a button.
+
+Highscore list, stored in nonvolatile memory, 4 slots probably, slot 1 for highscore and 3 slots that changes when new scores are added.
+        Function that compares scores.
+
+Text that shows up in between levels
+
+Speeding up game with the help of timer (global counter reaches a certain value probably).
+
+Global variable for lives, if all cities have been demolished --> game over.
+
+Game over screen == highscore list
+
+Press button to start.
