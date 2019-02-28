@@ -3,7 +3,6 @@
 #include <pic32mx.h>
 #include "driver/OLED_I2C.h"
 #include "defines.h"
-#include <math.h>
 
 /*
  * PUT IN GLOBAL DEFINE
@@ -36,7 +35,53 @@ typedef struct missile {
     int k, d, p;
     point progress[128];
     int shot;
+    int exploded;
 } missile;
+
+float absf(float x) {
+    if(x < 0) {
+        return (x * -1);
+    }
+    else {
+        return x;
+    }
+}
+
+float pow(float x, float y) {
+    int i;
+    float result = x;
+    for(i = 1; i < y; i++) {
+        result *= result;
+    }
+    return result;
+}
+
+float sqrt(float x) {
+    float x0 = x;
+    float x1;
+    for(; ;) {
+        x1 = x0 - (x0 * x0 - x)/(2 * x0);
+        float delta = (x1 - x0)/ x0;
+        if(delta < .000001 && delta > -.000001) {
+            return x1;
+        }
+        x0 = x1;
+    }
+}
+
+
+void shoot(missile * m, int sx, int sy, int dx, int dy) {
+    m->sx = sx;
+    m->sy = sy;
+    m->dx = dx;
+    m->dy = dy;
+    m->k  = (sy - dy) / (sx - dx);
+    m->d  = (int)sqrt(absf(pow((sx - dx), 2) + pow((sy - dy), 2)));
+    m->shot = 1;
+    m->p = 0;
+    m->exploded = 0;
+
+}
 
 void explode(missile * m, int x0, int y0, int radius)
 {
@@ -46,18 +91,74 @@ void explode(missile * m, int x0, int y0, int radius)
     int ychange = 0;
     int error = 0;
 
+    while(x0 >= y0) {
+        int i;
+        for(i = x0 - x; i <= x0 + x; i++) {
+            OLED_setPixel(i, y0 + y);
+            OLED_setPixel(i, y0 - y);
+        }
+        int j;
+        for(j = x0 - x; j <= x0 + x; j++) {
+            OLED_setPixel(i, y0 + x);
+            OLED_setPixel(i, y0 - x);
+        }
+
+        y++;
+        error += ychange;
+        ychange += 2;
+
+        if(((error << 1) + xchange) > 0) {
+            x--;
+            error += xchange;
+            xchange += 2;
+        }
+    }
+
 }
 
-void shoot(missile * m, int sx, int sy, int dx, int dy) {
-    m->sx = sx;
-    m->sy = sy;
-    m->dx = dx;
-    m->dy = dy;
-    m->k  = (sy - dy) / (sx - dx);
-    m->d  = (int)sqrt(abs(pow((sx - dx), 2) + pow((sy - dy), 2)));
-    m->shot = 1;
-    m->p = 0;
+void removecircle(missile * m, int x0, int y0, int radius) {
+    int x = radius;
+    int y = 0;
+    int xchange = 1 - (radius << 1);    // 1 - radius * 2
+    int ychange = 0;
+    int error = 0;
 
+    while(x0 >= y0) {
+        int i;
+        for(i = x0 - x; i <= x0 + x; i++) {
+            OLED_clrPixel(i, y0 + y);
+            OLED_setPixel(i, y0 - y);
+        }
+        int j;
+        for(j = x0 - x; j <= x0 + x; j++) {
+            OLED_clrPixel(i, y0 + x);
+            OLED_clrPixel(i, y0 - x);
+        }
+
+        y++;
+        error += ychange;
+        ychange += 2;
+
+        if(((error << 1) + xchange) > 0) {
+            x--;
+            error += xchange;
+            xchange += 2;
+        }
+    }
+}
+
+void clrmissile(missile * m) {
+    if(m->exploded) {
+        while(m->p >= 0) {
+            OLED_clrPixel(m->progress[m->p].x, m->progress[m->p].y);
+            m->p--;
+        }
+        int r = 1;
+        while(r <= 3) {
+            removecircle(m, m->dx, m->dy, r);
+            r++;
+        }
+    }
 }
 
 void missileUpdate(missile * m) {
@@ -66,7 +167,7 @@ void missileUpdate(missile * m) {
             int x  = m->sx;
             int y  = m->sy;
 
-            float derror = (float)abs((m->sy - m->dy)/(m->sx - m->dx));
+            float derror = absf((m->sy - m->dy)/(m->sx - m->dx));
             float error  = 0;
             
             if(m->sx < m->dx){
@@ -79,12 +180,19 @@ void missileUpdate(missile * m) {
             error = derror;
             while(error > 0.5){
                 y += (m->dy > m->sy?1 : -1);
-                error -= 1;
+                error -= 1.0;
             }
             m->progress[m->p].x = x;
             m->progress[m->p].y = y;
             m->p++;
             OLED_setPixel(x, y);
+        }
+        if(m->p == m->d) {
+            int r = 1;
+            while(r <= 3) {
+                 explode(m, m->dx, m->dy, r);
+            }
+            m->exploded = 1;
         }
     }
 }
