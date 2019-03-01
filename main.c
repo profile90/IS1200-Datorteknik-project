@@ -76,7 +76,7 @@ void shoot(missile * m, short sx, short sy, short dx, short dy) {
     m->dx = dx;
     m->dy = dy;
     m->k  = (sy - dy) / (sx - dx);
-    m->d  = (short)sqrt(absf(pow((sx - dx), 2) + pow((sy - dy), 2)));
+    m->d  = (short)sqrt(absf(pow((sx - dx), 2) + pow((sy - dy), 2) - 10));
     m->shot = 1;
     m->p = 0;
     m->exploded = 0;
@@ -188,7 +188,7 @@ void ISRHANDLER() {
 
   if((IFS(0) & 0x100)) {
     IFSCLR(0) = 0x100;
-    if(timeoutcount == 10){
+    if(timeoutcount == 1){
         if(ms[0].shot) {
             missileUpdate(&ms[0]);
         }
