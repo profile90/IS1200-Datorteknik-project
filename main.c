@@ -14,7 +14,7 @@
 #define RIGHT 0x1
 #define HEIGHT 64
 #define WIDTH 128
-
+#define MISSILEMAX 20
 typedef struct point {
     int x;
     int y;
@@ -198,6 +198,23 @@ void missileUpdate(missile * m) {
 }
 
 
+missile ms[20];
+
+
+void ISR() {
+    int i = 0;
+
+
+    for(i = 0; i < MISSILEMAX; i++) {
+        if(ms[i].shot) {
+            missileUpdate(&ms[i]);
+            if(ms[i].exploded) {
+                clrmissile(&m[i]);
+            }
+        }
+    }
+}
+
 void btnINIT() {
     TRISDSET = 0x103;
     TRISFSET = 0x2;
@@ -322,7 +339,6 @@ int main() {
     int dx, dy;
     int next = 0;
 
-    missile ms[20];
     int mi = 0;
     
 
