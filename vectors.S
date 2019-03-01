@@ -21,6 +21,8 @@
 		jr $k0
 .endm
 .global enable_interrupt
+.global ISRHANDLER
+
 .align 4
 .global __use_isr_install
 __use_isr_install:
@@ -100,7 +102,6 @@ STUB 63
 
 .align 4
 .global _isr_primary_install
-.global ISRHANDLER
 _isr_primary_install:
 .word _isr_trampoline
 .word _isr_trampoline

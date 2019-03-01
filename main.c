@@ -15,9 +15,12 @@
 #define HEIGHT 64
 #define WIDTH 128
 #define MISSILEMAX 20
+
+
+
 typedef struct point {
-    int x;
-    int y;
+    short x;
+    short y;
 } point;
 
 typedef struct cursor{
@@ -25,17 +28,17 @@ typedef struct cursor{
     point op;
 } cursor;
 
-int gx = 64;
-int gy = 32;
-int gox, goy;
+short gx = 64;
+short gy = 32;
+short gox, goy;
 
 typedef struct missile {
-    int sx, sy;
-    int dx, dy;
-    int k, d, p;
+    short sx, sy;
+    short dx, dy;
+    short k, d, p;
     point progress[128];
-    int shot;
-    int exploded;
+    short shot;
+    short exploded;
 } missile;
 
 float absf(float x) {
@@ -48,7 +51,7 @@ float absf(float x) {
 }
 
 float pow(float x, float y) {
-    int i;
+    uint16_t i;
     float result = x;
     for(i = 1; i < y; i++) {
         result *= result;
@@ -70,157 +73,138 @@ float sqrt(float x) {
 }
 
 
-void shoot(missile * m, int sx, int sy, int dx, int dy) {
+void shoot(missile * m, short sx, short sy, short dx, short dy) {
     m->sx = sx;
     m->sy = sy;
     m->dx = dx;
     m->dy = dy;
-    m->k  = (sy - dy) / (sx - dx);
-    m->d  = (int)sqrt(absf(pow((sx - dx), 2) + pow((sy - dy), 2)));
+    m->k  = ((sy - dy) / (sx - dx));
+    m->d  = (short)(sqrt(absf(pow((sx - dx), 2) + pow((sy - dy), 2))) - 10);
     m->shot = 1;
     m->p = 0;
     m->exploded = 0;
 
 }
 
-void explode(missile * m, int x0, int y0, int radius)
+void explode(missile * m, short x0, short y0, short radius)
 {
-    int x = radius;
-    int y = 0;
-    int xchange = 1 - (radius << 1);    // 1 - radius * 2
-    int ychange = 0;
-    int error = 0;
-
-    while(x0 >= y0) {
-        int i;
-        for(i = x0 - x; i <= x0 + x; i++) {
-            OLED_setPixel(i, y0 + y);
-            OLED_setPixel(i, y0 - y);
-        }
-        int j;
-        for(j = x0 - x; j <= x0 + x; j++) {
-            OLED_setPixel(i, y0 + x);
-            OLED_setPixel(i, y0 - x);
-        }
-
-        y++;
-        error += ychange;
-        ychange += 2;
-
-        if(((error << 1) + xchange) > 0) {
-            x--;
-            error += xchange;
-            xchange += 2;
+    short k, l;
+    for(k = -radius; k <= radius; k++) {
+        for( l = -radius; l <= radius; l++) {
+            if(k*k + l*l <= radius*radius) {
+                OLED_setPixel(x0 + l, y0 + k);
+            }
         }
     }
 
+
 }
 
-void removecircle(missile * m, int x0, int y0, int radius) {
-    int x = radius;
-    int y = 0;
-    int xchange = 1 - (radius << 1);    // 1 - radius * 2
-    int ychange = 0;
-    int error = 0;
-
-    while(x0 >= y0) {
-        int i;
-        for(i = x0 - x; i <= x0 + x; i++) {
-            OLED_clrPixel(i, y0 + y);
-            OLED_setPixel(i, y0 - y);
-        }
-        int j;
-        for(j = x0 - x; j <= x0 + x; j++) {
-            OLED_clrPixel(i, y0 + x);
-            OLED_clrPixel(i, y0 - x);
-        }
-
-        y++;
-        error += ychange;
-        ychange += 2;
-
-        if(((error << 1) + xchange) > 0) {
-            x--;
-            error += xchange;
-            xchange += 2;
+void removecircle(missile * m, uint16_t x0, uint16_t y0, uint16_t radius) {
+    short k, l;
+    for(k = -radius; k <= radius; k++) {
+        for( l = -radius; l <= radius; l++) {
+            if(k*k + l*l <= radius*radius) {
+                OLED_clrPixel(x0 + l, y0 + k);
+            }
         }
     }
 }
 
 void clrmissile(missile * m) {
-    if(m->exploded) {
         while(m->p >= 0) {
             OLED_clrPixel(m->progress[m->p].x, m->progress[m->p].y);
             m->p--;
         }
-        int r = 1;
-        while(r <= 3) {
-            removecircle(m, m->dx, m->dy, r);
-            r++;
-        }
-    }
+       removecircle(m, m->dx, m->dy, 5); 
+}
+
+void resetMissle(missile * m) {
+    m->sx = 0;
+    m->sy = 0;
+    m->dx = 0;
+    m->dy = 0;
+    m->k  = 0;
+    m->d  = 0;
+    m->shot = 0;
+    m->p = 0;
+    m->exploded = 0;
+
 }
 
 void missileUpdate(missile * m) {
     if(m->shot) {
-        if(m->p < m->d) {
-            int x  = m->sx;
-            int y  = m->sy;
 
-            float derror = absf((m->sy - m->dy)/(m->sx - m->dx));
-            float error  = 0;
-            
-            if(m->sx < m->dx){
-                x++;
-            }
-            else{
-                x--;
-            }
-            y = m->k * x;
-            error = derror;
-            while(error > 0.5){
-                y += (m->dy > m->sy?1 : -1);
-                error -= 1.0;
-            }
-            m->progress[m->p].x = x;
-            m->progress[m->p].y = y;
-            m->p++;
-            OLED_setPixel(x, y);
-        }
-        if(m->p == m->d) {
-            int r = 1;
-            while(r <= 3) {
-                 explode(m, m->dx, m->dy, r);
-            }
+        if((m->p >= 128) || (m->p >= m->d)) {
+            m->shot = 0;
+            short r = 2;
+            explode(m, m->dx, m->dy, 5);
             m->exploded = 1;
+
         }
-    }
+            if(m->p != 0) {
+                if(m->sx < m->dx){
+                    m->progress[m->p].x = (m->progress[m->p - 1].x) + 1;
+                }
+                else if(m->sx > m->dx){
+                    (m->progress[m->p].x = m->progress[m->p - 1].x) - 1;
+                }
+
+                else {
+                    if(m->sy < m->dy) {
+                        m->progress[m->p].y = m->progress[m->p].y - 1;
+                    }
+                    else if(m->sy > m->dy) {
+                        m->progress[m->p].y = m->progress[m->p].y + 1;
+                    }
+                }
+                
+                m->progress[m->p].y = m->k * (m->progress[m->p].x - m->sx) + m->sy;   
+            } 
+            else 
+            {
+                m->progress[m->p].x = m->sx;
+                m->progress[m->p].y = m->sy;
+            }
+            
+            
+            OLED_setPixel(m->progress[m->p].x, m->progress[m->p].y);
+            m->p++;
+
+        } 
+  
 }
 
 
+
 missile ms[20];
-int timeoutcount = 0;
+uint16_t timeoutcount = 0;
 
-void ISR() {
-    int i = 0;
+void ISRHANDLER() {
+    //uint16_t i = 0;
 
 
-    for(i = 0; i < MISSILEMAX; i++) {
+
+/*    for(i = 0; i < MISSILEMAX; i++) {
         if(ms[i].shot) {
-            missileUpdate(&ms[i]);
+            OLED_invert(i % 2);
+            //missileUpdate(&ms[i]);
             if(ms[i].exploded) {
-                clrmissile(&m[i]);
+                clrmissile(&ms[i]);
             }
         }
     }
-
+*/
   if((IFS(0) & 0x100)) {
-    IFSCLR(0) = 0x100;
-    if(timeoutcount == 10){
+    if(timeoutcount == 1){
+        if(ms[0].shot) {
+            missileUpdate(&ms[0]);
+        }
 
       timeoutcount = 0;
     }
     timeoutcount++;
+    IFSCLR(0) = 0x100;
   } 
 }
 
@@ -241,12 +225,12 @@ void btnINIT() {
     TRISFSET = 0x2;
 }
 
-int readBtn() {
+uint16_t readBtn() {
     while(1) {
-            int up   = (PORTD >> 5) & 0x8;
-            int left = (PORTD) & 0x2;
-            int right = (PORTD) & 0x1;
-            int down = (PORTF << 1) & 0x4;
+            uint16_t up   = (PORTD >> 5) & 0x8;
+            uint16_t left = (PORTD) & 0x2;
+            uint16_t right = (PORTD) & 0x1;
+            uint16_t down = (PORTF << 1) & 0x4;
 
             return up | left | right | down;
     }    
@@ -289,7 +273,7 @@ void stickINIT() {
 
 
 
-int getStickInput(bool stick) {
+uint16_t getStickInput(bool stick) {
     if(stick == XSTICK) {
         /*  AD1CHS-config
          *  bit 16-19 (0x2): set pin a0 (AN2) to input (MUX A settings)
@@ -324,8 +308,8 @@ int getStickInput(bool stick) {
 }
 
 
-void stickInput(int stick) {
-    int magnitude;
+void stickInput(uint16_t stick) {
+    uint16_t magnitude;
 
     if(stick == YSTICK) {
         magnitude = getStickInput(YSTICK);
@@ -351,7 +335,7 @@ void stickInput(int stick) {
 }
 
 
-int main() {
+uint16_t main() {
     timeINIT();
     btnINIT();
     stickINIT();
@@ -362,11 +346,11 @@ int main() {
 
     enable_interrupt();
     
-    int sx, sy;
-    int dx, dy;
-    int next = 0;
+    uint16_t sx, sy;
+    uint16_t dx, dy;
+    uint16_t next = 0;
 
-    int mi = 0;
+    uint16_t mi = 0;
     
 
     while(1) {
@@ -377,29 +361,28 @@ int main() {
         }
         
         if((readBtn() & DOWN) == 0){ //down
+            if(ms[0].exploded) {
+                clrmissile(&ms[0]);
+                resetMissle(&ms[0]);
+            }
         }
         
         if((readBtn() & LEFT) == 0){ //left
+                if(next = 1) {
+                    dx = gx;
+                    dy = gy;
+                    next = 0;
+                    shoot(&ms[0], sx, sy, dx, dy);
+                }
+
         }
         
         if((readBtn() & RIGHT) == 0){ //right
-            if(!next) {
                 sx = gx;
                 sy = gy;
                 next = 1;
-            }
-            else 
-            {
-                dx = gx;
-                dy = gy;
-                shoot(&ms[mi], sx, sy, dx, dy);
-                mi++;
-                if(mi == 20) {
-                    mi = 0;
-                }
-                next = 0;
-            }
         }
+
 
         if(!OLED_boundsCheck(gx, gy)) {
                 gx = 64;
