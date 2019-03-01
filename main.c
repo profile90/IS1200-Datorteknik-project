@@ -15,7 +15,7 @@
 #define HEIGHT 64
 #define WIDTH 128
 #define MISSILEMAX 20
-
+#define ENEMYSTARTINDEX 3
 
 
 typedef struct point {
@@ -122,6 +122,7 @@ void explode(missile * m, short x0, short y0, short radius)
             }
         }
     }
+    m->exploded = 0;
 
 
 }
@@ -142,22 +143,9 @@ void clrmissile(missile * m) {
             OLED_clrPixel(m->progress[m->p].x, m->progress[m->p].y);
             m->p--;
         }
-       removecircle(m, m->dx, m->dy, 5); 
+       removecircle(m, m->dx, m->dy, 4); 
 }
 
-void resetMissle(missile * m) {
-    m->sx = 0;
-    m->sy = 0;
-    m->dx = 0;
-    m->dy = 0;
-    m->k  = 0;
-    m->d  = 0;
-    m->shot = 0;
-    m->p = 0;
-    m->exploded = 0;
-    m->g = 0;
-
-}
 
 void swap(short * x, short * y) {
     short temp = *x;
@@ -179,6 +167,8 @@ void missileUpdate(missile * m) {
     if(m->cx == m->dx && m->cy == m->dy) {
         m->exploded = 1;
         m->shot = 0;
+        m->cx = 0;
+        m->cy = 0;
         return;
     }
 
@@ -187,7 +177,9 @@ void missileUpdate(missile * m) {
     if (e2 > -dx) { m->error -= dy; m->cx += sx; }
     if (e2 <  dy) { m->error += dx; m->cy += sy; }
 
-    
+    m->progress[m->p].x = m->cx;
+    m->progress[m->p].y = m->cy;
+    m->p++;    
 }
 
 
@@ -201,7 +193,9 @@ void ISRHANDLER() {
         if(ms[0].shot) {
             missileUpdate(&ms[0]);
         }
-
+        if(ms[0].exploded && ms[0].shot == 0) {     
+            explode(&ms[0], ms[0].dx, ms[0].dy, 4);
+        }
       timeoutcount = 0;
     }
     timeoutcount++;
@@ -332,12 +326,18 @@ void stickInput(short stick) {
     }
 }
 
+void missileBaseINIT(){
+    ms[0].
+}
+
 
 int main() {
     timeINIT();
     btnINIT();
     stickINIT();
     OLED_start();
+
+    missileBaseINIT();
 
     IPCSET(2) = 0x31; //Sets IPC02 to interrupt priority and subpriority to max priority, set makes sure that other bits dont change
     IECSET(0) = 0x100; //Sets bit 8 in IEC(0) to 1
@@ -360,7 +360,6 @@ int main() {
         
         if((readBtn() & DOWN) == 0){ //down
             clrmissile(&ms[0]);
-            resetMissle(&ms[0]);
         }
         
         if((readBtn() & LEFT) == 0){ //left
@@ -375,19 +374,14 @@ int main() {
         }
         
         if((readBtn() & RIGHT) == 0){ //right
-                sx = gx;
-                sy = gy;
-                next = 1;
+
         }
 
 
         if(!OLED_boundsCheck(gx, gy)) {
-                gx = 64;
-                gy = 32;
+
         }
 
-        OLED_clrPixel(gox, goy);
-        OLED_setPixel(gx, gy);
   
         OLED_refresh();
 
