@@ -176,7 +176,7 @@ void missileUpdate(missile * m) {
     int sx = m->sx < m->dx ? 1 : -1;
     int sy = m->sy < m->dy ? 1 : -1;
 
-    if(m->cx == m->dx || m->cy == m->dy) {
+    if(m->cx == m->dx && m->cy == m->dy) {
         m->exploded = 1;
         m->shot = 0;
         return;
