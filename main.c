@@ -9,7 +9,8 @@
  */
 
 #define UP 0x8
-#define DOWN 0x4 
+#define DOWN 0x4
+#define MIDDLE 0x0
 #define LEFT 0x2
 #define RIGHT 0x1
 #define HEIGHT 64
@@ -42,7 +43,7 @@ typedef struct missile {
     point progress[128];
     short shot;
     short exploded;
-    short g;
+    short cleared;
 } missile;
 
 float absf(float x) {
@@ -98,10 +99,9 @@ void shoot(missile * m, short sx, short sy, short dx, short dy) {
     m->shot = 1;
     m->p = 0;
     m->exploded = 0;
-    m->g = 0;
 
     m->error = 0xff;
-
+    m->cleared = -6;
 
     int dx_ = absi(m->dx - m->sx);
     int dy_ = absi(m->dy - m->sy);
@@ -155,7 +155,10 @@ void swap(short * x, short * y) {
 
 void missileUpdate(missile * m) {
     OLED_setPixel(m->cx, m->cy);
-    
+    /*
+        Adapted from http://rosettacode.org/wiki/Bitmap/Bresenham%27s_line_algorithm#C
+        Using the Bresenham line algorithm.
+    */
     int e2;
 
     int dx = absi(m->dx - m->sx);
@@ -189,13 +192,23 @@ short timeoutcount = 0;
 
 void ISRHANDLER() {
   if((IFS(0) & 0x100)) {
+    int i = 0;
     if(timeoutcount == 1){
-        if(ms[0].shot) {
-            missileUpdate(&ms[0]);
-        }
-        if(ms[0].exploded && ms[0].shot == 0) {     
-            explode(&ms[0], ms[0].dx, ms[0].dy, 4);
-        }
+        for(i = 0; i < MISSILEMAX; i++) {
+            if(ms[i].shot) {
+                missileUpdate(&ms[i]);
+            }
+            if(ms[i].exploded && ms[i].shot == 0) {     
+                explode(&ms[i], ms[i].dx, ms[i].dy, 4);
+            }
+            if(ms[i].exploded == 0 && ms[i].shot == 0 && ms[i].cleared == 0) {
+                clrmissile(&ms[i]);
+                ms[i].cleared = 1;
+            } else if(ms[i].exploded == 0 && ms[i].shot == 0) {
+                ms[i].cleared++;
+            }
+    }
+
       timeoutcount = 0;
     }
     timeoutcount++;
@@ -327,8 +340,17 @@ void stickInput(short stick) {
 }
 
 void missileBaseINIT(){
-    ms[0].
+    
 }
+
+    
+typedef struct player {
+    uint8_t cities;
+    uint16_t ammo_b1;
+    uint16_t ammo_b2;
+    uint16_t ammo_b3;
+    int score;
+} Player;
 
 
 int main() {
@@ -344,45 +366,52 @@ int main() {
 
     enable_interrupt();
     
-    short sx, sy;
     short dx, dy;
     short next = 0;
 
     short mi = 0;
-    
 
     while(1) {
         stickInput(XSTICK);
         stickInput(YSTICK); 
 
         if((readBtn() & UP) == 0){ //up
+
         }
         
         if((readBtn() & DOWN) == 0){ //down
-            clrmissile(&ms[0]);
+            if(!ms[mi].shot){
+                shoot(&ms[mi], 64, 59, gx, gy);
+            }
+            mi++;
         }
         
         if((readBtn() & LEFT) == 0){ //left
-                if(next = 1) {
-                    dx = gx;
-                    dy = gy;
-                    next = 0;
-                    shoot(&ms[0], sx, sy, dx, dy);
-                }
-             
-
+            if(!ms[mi].shot){
+                shoot(&ms[mi], 32, 59, gx, gy);
+            }
+            mi++;
         }
         
         if((readBtn() & RIGHT) == 0){ //right
-
+            if(!ms[mi].shot){
+                shoot(&ms[mi], 96, 59, gx, gy);
+            }
+            mi++;
         }
 
+        if(mi >= 20) {
+            mi = 0;
+        }
 
         if(!OLED_boundsCheck(gx, gy)) {
-
+            gx = 64;
+            gy = 32;
         }
+            OLED_clrPixel(gox, goy);
+            OLED_setPixel(gx, gy);
 
-  
+     
         OLED_refresh();
 
     }
