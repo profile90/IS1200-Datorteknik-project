@@ -35,10 +35,14 @@ short gox, goy;
 typedef struct missile {
     short sx, sy;
     short dx, dy;
-    short k, d, p;
+    short cx, cy;
+    short p;
+    float k, d;
+    int error;
     point progress[128];
     short shot;
     short exploded;
+    short g;
 } missile;
 
 float absf(float x) {
@@ -49,9 +53,17 @@ float absf(float x) {
         return x;
     }
 }
+int absi(int x) {
+    if(x < 0) {
+        return (x * -1);
+    }
+    else {
+        return x;
+    }
+}
 
 float pow(float x, float y) {
-    uint16_t i;
+    short i;
     float result = x;
     for(i = 1; i < y; i++) {
         result *= result;
@@ -76,6 +88,9 @@ float sqrt(float x) {
 void shoot(missile * m, short sx, short sy, short dx, short dy) {
     m->sx = sx;
     m->sy = sy;
+    m->cx = sx;
+    m->cy = sy;
+
     m->dx = dx;
     m->dy = dy;
     m->k  = ((sy - dy) / (sx - dx));
@@ -83,6 +98,17 @@ void shoot(missile * m, short sx, short sy, short dx, short dy) {
     m->shot = 1;
     m->p = 0;
     m->exploded = 0;
+    m->g = 0;
+
+    m->error = 0xff;
+
+
+    int dx_ = absi(m->dx - m->sx);
+    int dy_ = absi(m->dy - m->sy);
+
+    int sx_ = m->sx < m->dx ? 1 : -1;
+    int sy_ = m->sy < m->dy ? 1 : -1;
+    m->error = (dx_ > dy_ ? dx_ : -dy_) / 2;
 
 }
 
@@ -100,7 +126,7 @@ void explode(missile * m, short x0, short y0, short radius)
 
 }
 
-void removecircle(missile * m, uint16_t x0, uint16_t y0, uint16_t radius) {
+void removecircle(missile * m, short x0, short y0, short radius) {
     short k, l;
     for(k = -radius; k <= radius; k++) {
         for( l = -radius; l <= radius; l++) {
@@ -129,72 +155,47 @@ void resetMissle(missile * m) {
     m->shot = 0;
     m->p = 0;
     m->exploded = 0;
+    m->g = 0;
 
 }
 
+void swap(short * x, short * y) {
+    short temp = *x;
+    *x = *y;
+    *y = temp;
+}
+
 void missileUpdate(missile * m) {
-    if(m->shot) {
+    OLED_setPixel(m->cx, m->cy);
+    
+    int e2;
 
-        if((m->p >= 128) || (m->p >= m->d)) {
-            m->shot = 0;
-            short r = 2;
-            explode(m, m->dx, m->dy, 5);
-            m->exploded = 1;
+    int dx = absi(m->dx - m->sx);
+    int dy = absi(m->dy - m->sy);
 
-        }
-            if(m->p != 0) {
-                if(m->sx < m->dx){
-                    m->progress[m->p].x = (m->progress[m->p - 1].x) + 1;
-                }
-                else if(m->sx > m->dx){
-                    (m->progress[m->p].x = m->progress[m->p - 1].x) - 1;
-                }
+    int sx = m->sx < m->dx ? 1 : -1;
+    int sy = m->sy < m->dy ? 1 : -1;
 
-                else {
-                    if(m->sy < m->dy) {
-                        m->progress[m->p].y = m->progress[m->p].y - 1;
-                    }
-                    else if(m->sy > m->dy) {
-                        m->progress[m->p].y = m->progress[m->p].y + 1;
-                    }
-                }
-                
-                m->progress[m->p].y = m->k * (m->progress[m->p].x - m->sx) + m->sy;   
-            } 
-            else 
-            {
-                m->progress[m->p].x = m->sx;
-                m->progress[m->p].y = m->sy;
-            }
-            
-            
-            OLED_setPixel(m->progress[m->p].x, m->progress[m->p].y);
-            m->p++;
+    if(m->cx == m->dx || m->cy == m->dy) {
+        m->exploded = 1;
+        m->shot = 0;
+        return;
+    }
 
-        } 
-  
+    e2 = m->error;
+
+    if (e2 > -dx) { m->error -= dy; m->cx += sx; }
+    if (e2 <  dy) { m->error += dx; m->cy += sy; }
+
+    
 }
 
 
 
 missile ms[20];
-uint16_t timeoutcount = 0;
+short timeoutcount = 0;
 
 void ISRHANDLER() {
-    //uint16_t i = 0;
-
-
-
-/*    for(i = 0; i < MISSILEMAX; i++) {
-        if(ms[i].shot) {
-            OLED_invert(i % 2);
-            //missileUpdate(&ms[i]);
-            if(ms[i].exploded) {
-                clrmissile(&ms[i]);
-            }
-        }
-    }
-*/
   if((IFS(0) & 0x100)) {
     if(timeoutcount == 1){
         if(ms[0].shot) {
@@ -225,7 +226,7 @@ void btnINIT() {
     TRISFSET = 0x2;
 }
 
-uint16_t readBtn() {
+short readBtn() {
     while(1) {
             uint16_t up   = (PORTD >> 5) & 0x8;
             uint16_t left = (PORTD) & 0x2;
@@ -271,9 +272,7 @@ void stickINIT() {
     AD1CON1 |= (0x1 << 15);             
 }
 
-
-
-uint16_t getStickInput(bool stick) {
+short getStickInput(bool stick) {
     if(stick == XSTICK) {
         /*  AD1CHS-config
          *  bit 16-19 (0x2): set pin a0 (AN2) to input (MUX A settings)
@@ -307,9 +306,8 @@ uint16_t getStickInput(bool stick) {
     return ADC1BUF0;
 }
 
-
-void stickInput(uint16_t stick) {
-    uint16_t magnitude;
+void stickInput(short stick) {
+    short magnitude;
 
     if(stick == YSTICK) {
         magnitude = getStickInput(YSTICK);
@@ -335,7 +333,7 @@ void stickInput(uint16_t stick) {
 }
 
 
-uint16_t main() {
+int main() {
     timeINIT();
     btnINIT();
     stickINIT();
@@ -346,11 +344,11 @@ uint16_t main() {
 
     enable_interrupt();
     
-    uint16_t sx, sy;
-    uint16_t dx, dy;
-    uint16_t next = 0;
+    short sx, sy;
+    short dx, dy;
+    short next = 0;
 
-    uint16_t mi = 0;
+    short mi = 0;
     
 
     while(1) {
@@ -361,10 +359,8 @@ uint16_t main() {
         }
         
         if((readBtn() & DOWN) == 0){ //down
-            if(ms[0].exploded) {
-                clrmissile(&ms[0]);
-                resetMissle(&ms[0]);
-            }
+            clrmissile(&ms[0]);
+            resetMissle(&ms[0]);
         }
         
         if((readBtn() & LEFT) == 0){ //left
@@ -374,6 +370,7 @@ uint16_t main() {
                     next = 0;
                     shoot(&ms[0], sx, sy, dx, dy);
                 }
+             
 
         }
         
