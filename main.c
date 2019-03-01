@@ -199,7 +199,7 @@ void missileUpdate(missile * m) {
 
 
 missile ms[20];
-
+int timeoutcount = 0;
 
 void ISR() {
     int i = 0;
@@ -213,6 +213,27 @@ void ISR() {
             }
         }
     }
+
+  if((IFS(0) & 0x100)) {
+    IFSCLR(0) = 0x100;
+    if(timeoutcount == 10){
+
+      timeoutcount = 0;
+    }
+    timeoutcount++;
+  } 
+}
+
+#define TMR2PERIOD ((80000000 / 256) / 10)
+#if TMR2PERIOD > 0xffff
+#error "Timer period is too big."
+#endif
+
+void timeINIT() {
+  T2CON = 0x70;
+  PR2 = TMR2PERIOD;
+  TMR2 = 0;
+  T2CONSET = 0x8000; /* Start the timer*/
 }
 
 void btnINIT() {
@@ -331,9 +352,15 @@ void stickInput(int stick) {
 
 
 int main() {
+    timeINIT();
     btnINIT();
     stickINIT();
     OLED_start();
+
+    IPCSET(2) = 0x31; //Sets IPC02 to interrupt priority and subpriority to max priority, set makes sure that other bits dont change
+    IECSET(0) = 0x100; //Sets bit 8 in IEC(0) to 1
+
+    enable_interrupt();
     
     int sx, sy;
     int dx, dy;
