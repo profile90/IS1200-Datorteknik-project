@@ -353,7 +353,7 @@ typedef struct player {
 } Player;
 
 
-int main() {
+short main() {
     timeINIT();
     btnINIT();
     stickINIT();
