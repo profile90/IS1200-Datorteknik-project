@@ -339,6 +339,26 @@ void stickInput(short stick) {
     }
 }
 
+short mcollisiondetect(short x1, short y1, short x2, short y2) { 
+    short mcollision = 0;
+
+    if(x1 == x2 && y1 == y2) {
+        mcollision = 1;
+    }
+
+    return mcollision;
+}
+
+short explosioncollision(short a, short b, short x, short y, short radius) {
+    short ecollision = 0;
+
+    if((x - a)*(x - a) + (y - b) * (y - b) <= radius * radius) {
+        ecollision = 1;
+    }
+
+    return ecollision;
+}
+
 void missileBaseINIT(){
     
 }
