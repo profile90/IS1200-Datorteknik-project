@@ -84,9 +84,30 @@ float sqrt(float x) {
         x0 = x1;
     }
 }
+void removecircle(missile * m, short x0, short y0, short radius) {
+    short k, l;
+    for(k = -radius; k <= radius; k++) {
+        for( l = -radius; l <= radius; l++) {
+            if(k*k + l*l <= radius*radius) {
+                OLED_clrPixel(x0 + l, y0 + k);
+            }
+        }
+    }
+}
 
+
+void clrmissile(missile * m) {
+        while(m->p >= 0) {
+            OLED_clrPixel(m->progress[m->p].x, m->progress[m->p].y);
+            m->p--;
+        }
+       removecircle(m, m->dx, m->dy, 4); 
+}
 
 void shoot(missile * m, short sx, short sy, short dx, short dy) {
+
+    clrmissile(m);
+
     m->sx = sx;
     m->sy = sy;
     m->cx = sx;
@@ -127,24 +148,6 @@ void explode(missile * m, short x0, short y0, short radius)
 
 }
 
-void removecircle(missile * m, short x0, short y0, short radius) {
-    short k, l;
-    for(k = -radius; k <= radius; k++) {
-        for( l = -radius; l <= radius; l++) {
-            if(k*k + l*l <= radius*radius) {
-                OLED_clrPixel(x0 + l, y0 + k);
-            }
-        }
-    }
-}
-
-void clrmissile(missile * m) {
-        while(m->p >= 0) {
-            OLED_clrPixel(m->progress[m->p].x, m->progress[m->p].y);
-            m->p--;
-        }
-       removecircle(m, m->dx, m->dy, 4); 
-}
 
 
 void swap(short * x, short * y) {
@@ -408,8 +411,8 @@ short main() {
             gx = 64;
             gy = 32;
         }
-            OLED_clrPixel(gox, goy);
-            OLED_setPixel(gx, gy);
+        OLED_clrPixel(gox, goy);
+        OLED_setPixel(gx, gy);
 
      
         OLED_refresh();
