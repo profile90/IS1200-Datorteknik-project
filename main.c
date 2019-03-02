@@ -24,11 +24,6 @@ typedef struct point {
     short y;
 } point;
 
-typedef struct cursor{
-    point p;
-    point op;
-} cursor;
-
 short gx = 64;
 short gy = 32;
 short gox, goy;
@@ -45,6 +40,12 @@ typedef struct missile {
     short exploded;
     short cleared;
 } missile;
+
+typedef struct cursor {
+    point co[5];
+} Cursor;
+
+Cursor c;
 
 float absf(float x) {
     if(x < 0) {
@@ -342,10 +343,48 @@ void stickInput(short stick) {
     }
 }
 
+short mcollisiondetect(missile * m, missile * enemy) { 
+    short mcollision = 0;
+
+    if(m->progress[m->p].x == enemy->progress[enemy->p].x && m->progress[m->p].y == enemy->progress[enemy->p].y) {
+        mcollision = 1;
+    }
+
+    return mcollision;
+}
+
+short explosioncollision(missile * m, short a, short b, short radius) {
+    short ecollision = 0;
+
+    if((m->progress[m->p].x - a)*(m->progress[m->p].x - a) + (m->progress[m->p].y - b) * (m->progress[m->p].y - b) <= radius * radius) {
+        ecollision = 1;
+    }
+
+    return ecollision;
+}
+
 void missileBaseINIT(){
     
 }
 
+
+
+void cursorINIT() {
+    c.co[0].x = gx;
+    c.co[0].y = gy;
+    
+    c.co[1].x = gx;
+    c.co[1].y = gy + 1;
+
+    c.co[2].x = gx;
+    c.co[2].y = gy - 1;
+
+    c.co[3].x = gx + 1;
+    c.co[3].y = gy;
+
+    c.co[4].x = gx - 1;
+    c.co[4].y = gy;
+}
     
 typedef struct player {
     uint8_t cities;
@@ -362,6 +401,7 @@ short main() {
     stickINIT();
     OLED_start();
 
+    cursorINIT();
     missileBaseINIT();
 
     IPCSET(2) = 0x31; //Sets IPC02 to interrupt priority and subpriority to max priority, set makes sure that other bits dont change
@@ -377,6 +417,7 @@ short main() {
     while(1) {
         stickInput(XSTICK);
         stickInput(YSTICK); 
+        cursorINIT();
 
         if((readBtn() & UP) == 0){ //up
 
@@ -411,8 +452,17 @@ short main() {
             gx = 64;
             gy = 32;
         }
-        OLED_clrPixel(gox, goy);
-        OLED_setPixel(gx, gy);
+            OLED_clrPixel(gox, goy);
+            OLED_clrPixel(gox + 1, goy);
+            OLED_clrPixel(gox - 1, goy);
+            OLED_clrPixel(gox, goy + 1);
+            OLED_clrPixel(gox, goy - 1);
+
+            OLED_setPixel(c.co[0].x, c.co[0].y);
+            OLED_setPixel(c.co[1].x, c.co[1].y);
+            OLED_setPixel(c.co[2].x, c.co[2].y);
+            OLED_setPixel(c.co[3].x, c.co[3].y);
+            OLED_setPixel(c.co[4].x, c.co[4].y);
 
      
         OLED_refresh();
