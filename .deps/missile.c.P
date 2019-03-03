@@ -1,0 +1,2 @@
+missile.c.o: missile.c missile.h
+missile.c missile.h :

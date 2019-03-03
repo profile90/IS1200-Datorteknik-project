@@ -3,227 +3,39 @@
 #include <pic32mx.h>
 #include "driver/OLED_I2C.h"
 #include "defines.h"
+#include "maths.h"
+#include "missile.h"
+#include "main.h"
 
-/*
- * PUT IN GLOBAL DEFINE
- */
-
-#define UP 0x8
-#define DOWN 0x4
-#define MIDDLE 0x0
-#define LEFT 0x2
-#define RIGHT 0x1
-#define HEIGHT 64
-#define WIDTH 128
-#define MISSILEMAX 20
-#define ENEMYSTARTINDEX 3
-
-
-typedef struct point {
-    short x;
-    short y;
-} point;
-
-short gx = 64;
-short gy = 32;
-short gox, goy;
-
-typedef struct missile {
-    short sx, sy;
-    short dx, dy;
-    short cx, cy;
-    short p;
-    float k, d;
-    int error;
-    point progress[128];
-    short shot;
-    short exploded;
-    short cleared;
-} missile;
-
-typedef struct cursor {
-    point co[5];
-} Cursor;
-
-Cursor c;
-
-float absf(float x) {
-    if(x < 0) {
-        return (x * -1);
-    }
-    else {
-        return x;
-    }
-}
-int absi(int x) {
-    if(x < 0) {
-        return (x * -1);
-    }
-    else {
-        return x;
-    }
-}
-
-float pow(float x, float y) {
-    short i;
-    float result = x;
-    for(i = 1; i < y; i++) {
-        result *= result;
-    }
-    return result;
-}
-
-float sqrt(float x) {
-    float x0 = x;
-    float x1;
-    for(; ;) {
-        x1 = x0 - (x0 * x0 - x)/(2 * x0);
-        float delta = (x1 - x0)/ x0;
-        if(delta < .000001 && delta > -.000001) {
-            return x1;
-        }
-        x0 = x1;
-    }
-}
-void removecircle(missile * m, short x0, short y0, short radius) {
-    short k, l;
-    for(k = -radius; k <= radius; k++) {
-        for( l = -radius; l <= radius; l++) {
-            if(k*k + l*l <= radius*radius) {
-                OLED_clrPixel(x0 + l, y0 + k);
-            }
-        }
-    }
-}
-
-
-void clrmissile(missile * m) {
-        while(m->p >= 0) {
-            OLED_clrPixel(m->progress[m->p].x, m->progress[m->p].y);
-            m->p--;
-        }
-       removecircle(m, m->dx, m->dy, 4); 
-}
-
-void shoot(missile * m, short sx, short sy, short dx, short dy) {
-
-    clrmissile(m);
-
-    m->sx = sx;
-    m->sy = sy;
-    m->cx = sx;
-    m->cy = sy;
-
-    m->dx = dx;
-    m->dy = dy;
-    m->k  = ((sy - dy) / (sx - dx));
-    m->d  = (short)(sqrt(absf(pow((sx - dx), 2) + pow((sy - dy), 2))) - 10);
-    m->shot = 1;
-    m->p = 0;
-    m->exploded = 0;
-
-    m->error = 0xff;
-    m->cleared = -6;
-
-    int dx_ = absi(m->dx - m->sx);
-    int dy_ = absi(m->dy - m->sy);
-
-    int sx_ = m->sx < m->dx ? 1 : -1;
-    int sy_ = m->sy < m->dy ? 1 : -1;
-    m->error = (dx_ > dy_ ? dx_ : -dy_) / 2;
-
-}
-
-void explode(missile * m, short x0, short y0, short radius)
-{
-    short k, l;
-    for(k = -radius; k <= radius; k++) {
-        for( l = -radius; l <= radius; l++) {
-            if(k*k + l*l <= radius*radius) {
-                OLED_setPixel(x0 + l, y0 + k);
-            }
-        }
-    }
-    m->exploded = 0;
-
-
-}
-
-
-
-void swap(short * x, short * y) {
-    short temp = *x;
-    *x = *y;
-    *y = temp;
-}
-
-void missileUpdate(missile * m) {
-    OLED_setPixel(m->cx, m->cy);
-    /*
-        Adapted from http://rosettacode.org/wiki/Bitmap/Bresenham%27s_line_algorithm#C
-        Using the Bresenham line algorithm.
-    */
-    int e2;
-
-    int dx = absi(m->dx - m->sx);
-    int dy = absi(m->dy - m->sy);
-
-    int sx = m->sx < m->dx ? 1 : -1;
-    int sy = m->sy < m->dy ? 1 : -1;
-
-    if(m->cx == m->dx && m->cy == m->dy) {
-        m->exploded = 1;
-        m->shot = 0;
-        m->cx = 0;
-        m->cy = 0;
-        return;
-    }
-
-    e2 = m->error;
-
-    if (e2 > -dx) { m->error -= dy; m->cx += sx; }
-    if (e2 <  dy) { m->error += dx; m->cy += sy; }
-
-    m->progress[m->p].x = m->cx;
-    m->progress[m->p].y = m->cy;
-    m->p++;    
-}
-
-
-
-missile ms[20];
-short timeoutcount = 0;
 
 void ISRHANDLER() {
   if((IFS(0) & 0x100)) {
     int i = 0;
-    if(timeoutcount == 1){
+    int j = 0;
+    if(timeoutcount == 100) {
         for(i = 0; i < MISSILEMAX; i++) {
-            if(ms[i].shot) {
-                missileUpdate(&ms[i]);
+            missileHandle(&ms[i]);
+            missileHandle(&en[i]);
+            for(j = 0; j < MISSILEMAX; j++) {
+                if(ms[i].shot && en[j].shot) {
+                    if(collision(&ms[i], &en[j])) {
+                        ms[i].exploded = 1;
+                        ms[i].shot = 0;
+                        en[j].exploded = 1;
+                        en[j].shot = 0;
+                    } 
+                }
             }
-            if(ms[i].exploded && ms[i].shot == 0) {     
-                explode(&ms[i], ms[i].dx, ms[i].dy, 4);
-            }
-            if(ms[i].exploded == 0 && ms[i].shot == 0 && ms[i].cleared == 0) {
-                clrmissile(&ms[i]);
-                ms[i].cleared = 1;
-            } else if(ms[i].exploded == 0 && ms[i].shot == 0) {
-                ms[i].cleared++;
-            }
+        }
+        timeoutcount = 0;
     }
 
-      timeoutcount = 0;
-    }
+    enmissilecounter++;
     timeoutcount++;
     IFSCLR(0) = 0x100;
   } 
 }
 
-#define TMR2PERIOD ((80000000 / 256) / 10)
-#if TMR2PERIOD > 0xffff
-#error "Timer period is too big."
-#endif
 
 void timeINIT() {
   T2CON = 0x70;
@@ -324,10 +136,10 @@ void stickInput(short stick) {
         magnitude = getStickInput(YSTICK);
         goy = gy;
         if(magnitude > STICKUPPERLIMIT) {
-            gy--;
+            gy -= 2;
         } 
         if(magnitude < STICKLOWERLIMIT) {
-            gy++;
+            gy += 2;
         }
     }
 
@@ -335,39 +147,13 @@ void stickInput(short stick) {
         magnitude = getStickInput(XSTICK);
         gox = gx;
         if(magnitude > STICKUPPERLIMIT) {
-            gx++;
+            gx += 2;
         } 
         if(magnitude < STICKLOWERLIMIT) {
-            gx--;
+            gx -= 2;
         }
     }
 }
-
-short mcollisiondetect(missile * m, missile * enemy) { 
-    short mcollision = 0;
-
-    if(m->progress[m->p].x == enemy->progress[enemy->p].x && m->progress[m->p].y == enemy->progress[enemy->p].y) {
-        mcollision = 1;
-    }
-
-    return mcollision;
-}
-
-short explosioncollision(missile * m, short a, short b, short radius) {
-    short ecollision = 0;
-
-    if((m->progress[m->p].x - a)*(m->progress[m->p].x - a) + (m->progress[m->p].y - b) * (m->progress[m->p].y - b) <= radius * radius) {
-        ecollision = 1;
-    }
-
-    return ecollision;
-}
-
-void missileBaseINIT(){
-    
-}
-
-
 
 void cursorINIT() {
     c.co[0].x = gx;
@@ -386,14 +172,6 @@ void cursorINIT() {
     c.co[4].y = gy;
 }
     
-typedef struct player {
-    uint8_t cities;
-    uint16_t ammo_b1;
-    uint16_t ammo_b2;
-    uint16_t ammo_b3;
-    int score;
-} Player;
-
 
 short main() {
     timeINIT();
@@ -402,7 +180,6 @@ short main() {
     OLED_start();
 
     cursorINIT();
-    missileBaseINIT();
 
     IPCSET(2) = 0x31; //Sets IPC02 to interrupt priority and subpriority to max priority, set makes sure that other bits dont change
     IECSET(0) = 0x100; //Sets bit 8 in IEC(0) to 1
@@ -412,12 +189,16 @@ short main() {
     short dx, dy;
     short next = 0;
 
-    short mi = 0;
-
     while(1) {
         stickInput(XSTICK);
         stickInput(YSTICK); 
         cursorINIT();
+        if(mi >= MISSILEMAX) {
+            mi = 0;
+        }
+        if(ei >= MISSILEMAX) {
+            ei = 0;
+        }
 
         if((readBtn() & UP) == 0){ //up
 
@@ -444,27 +225,43 @@ short main() {
             mi++;
         }
 
-        if(mi >= 20) {
-            mi = 0;
-        }
-
         if(!OLED_boundsCheck(gx, gy)) {
             gx = 64;
             gy = 32;
         }
-            OLED_clrPixel(gox, goy);
-            OLED_clrPixel(gox + 1, goy);
-            OLED_clrPixel(gox - 1, goy);
-            OLED_clrPixel(gox, goy + 1);
-            OLED_clrPixel(gox, goy - 1);
 
-            OLED_setPixel(c.co[0].x, c.co[0].y);
-            OLED_setPixel(c.co[1].x, c.co[1].y);
-            OLED_setPixel(c.co[2].x, c.co[2].y);
-            OLED_setPixel(c.co[3].x, c.co[3].y);
-            OLED_setPixel(c.co[4].x, c.co[4].y);
+        prev = TMR2 & 0x7f;
+       
 
-     
+        if(enmissilecounter >= 9000) {
+            short dx;
+            short dy = 59;
+            switch((prev & 0x7)) {
+                case 0:
+                case 1:
+                    dx = 32;
+                    break;
+                case 2:
+                    dx = 64;
+                    break;
+                case 3:
+                    dx = 96;
+                    break;
+            }
+            shoot(&en[ei], prev, 4, dx, dy);
+            ei++;
+            enmissilecounter = 0;
+        }
+
+        
+        OLED_clrPixel(gox, goy);
+        OLED_clrPixel(gox + 1, goy);
+        OLED_clrPixel(gox - 1, goy);
+        OLED_clrPixel(gox, goy + 1);
+        OLED_clrPixel(gox, goy - 1);
+        int i = 0;
+        for(i = 0; i < 5; i++)
+            OLED_setPixel(c.co[i].x, c.co[i].y);
         OLED_refresh();
 
     }
